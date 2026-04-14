@@ -1,6 +1,26 @@
 import { z } from "zod";
 import { cleanCNPJ, validateCNPJ } from "./cnpj";
 
+export const socioSchema = z.object({
+  nome: z.string().min(1, "Nome é obrigatório"),
+  cpfCnpj: z.string().default(""),
+  qualificacao: z.string().default(""),
+  dataEntrada: z.string().default(""),
+  faixaEtaria: z.string().default(""),
+});
+
+export type SocioFormData = z.infer<typeof socioSchema>;
+
+export const socioApiSchema = z.object({
+  nome: z.string().min(1),
+  cpfCnpj: z.string().nullable().optional(),
+  qualificacao: z.string().nullable().optional(),
+  dataEntrada: z.string().nullable().optional(),
+  faixaEtaria: z.string().nullable().optional(),
+});
+
+export type SocioApiData = z.infer<typeof socioApiSchema>;
+
 export const empresaFormSchema = z.object({
   cnpj: z.string().refine((v) => validateCNPJ(cleanCNPJ(v)), {
     message: "CNPJ inválido",
@@ -23,6 +43,7 @@ export const empresaFormSchema = z.object({
   cep: z.string().default(""),
   email: z.string().default(""),
   telefone: z.string().default(""),
+  socios: z.array(socioSchema).default([]),
 });
 
 // Input type (what the form fields hold — optional fields can be undefined)
@@ -50,6 +71,7 @@ export const empresaApiSchema = z.object({
   cep: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
   telefone: z.string().nullable().optional(),
+  socios: z.array(socioApiSchema).default([]),
 });
 
 export type EmpresaApiData = z.infer<typeof empresaApiSchema>;

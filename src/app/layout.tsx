@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -30,8 +31,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-gray-50">
         <header className="border-b bg-white">
-          <div className="container mx-auto px-4 py-3 max-w-6xl">
-            <h2 className="text-lg font-semibold tracking-tight">AIOX CRM</h2>
+          <div className="mx-auto px-4 py-3 w-[80%]">
+            <Link href="/empresas">
+              <h2 className="text-lg font-semibold tracking-tight">AIOX CRM</h2>
+            </Link>
           </div>
         </header>
         <main className="flex-1">{children}</main>

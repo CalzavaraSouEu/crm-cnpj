@@ -4,6 +4,14 @@ import { NextRequest } from "next/server";
 const cache = new Map<string, { data: EmpresaData; timestamp: number }>();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
+interface SocioData {
+  nome: string;
+  cpfCnpj: string | null;
+  qualificacao: string | null;
+  dataEntrada: string | null;
+  faixaEtaria: string | null;
+}
+
 interface EmpresaData {
   cnpj: string;
   razaoSocial: string;
@@ -24,6 +32,7 @@ interface EmpresaData {
   cep: string | null;
   email: string | null;
   telefone: string | null;
+  socios: SocioData[];
 }
 
 async function fetchBrasilAPI(cnpj: string): Promise<EmpresaData> {
@@ -33,6 +42,16 @@ async function fetchBrasilAPI(cnpj: string): Promise<EmpresaData> {
   );
   if (!res.ok) throw new Error(`BrasilAPI: ${res.status}`);
   const data = await res.json();
+
+  const socios: SocioData[] = Array.isArray(data.qsa)
+    ? data.qsa.map((s: Record<string, unknown>) => ({
+        nome: String(s.nome_socio || ""),
+        cpfCnpj: (s.cnpj_cpf_do_socio as string) || null,
+        qualificacao: (s.qualificacao_socio as string) || null,
+        dataEntrada: (s.data_entrada_sociedade as string) || null,
+        faixaEtaria: (s.faixa_etaria as string) || null,
+      }))
+    : [];
 
   return {
     cnpj: data.cnpj,
@@ -56,6 +75,7 @@ async function fetchBrasilAPI(cnpj: string): Promise<EmpresaData> {
     telefone: data.ddd_telefone_1
       ? `(${data.ddd_telefone_1.slice(0, 2)}) ${data.ddd_telefone_1.slice(2)}`
       : null,
+    socios,
   };
 }
 
@@ -69,6 +89,19 @@ async function fetchOpenCNPJ(cnpj: string): Promise<EmpresaData> {
 
   const estabelecimento = data.estabelecimento || {};
   const cnaePrincipal = estabelecimento.atividade_principal || {};
+
+  const socios: SocioData[] = Array.isArray(data.socios)
+    ? data.socios.map((s: Record<string, unknown>) => ({
+        nome: String(s.nome || ""),
+        cpfCnpj: (s.cpf_cnpj as string) || null,
+        qualificacao:
+          typeof s.qualificacao === "object" && s.qualificacao !== null
+            ? String((s.qualificacao as Record<string, unknown>).descricao || "")
+            : (s.qualificacao as string) || null,
+        dataEntrada: (s.data_entrada as string) || null,
+        faixaEtaria: null,
+      }))
+    : [];
 
   return {
     cnpj: estabelecimento.cnpj || cnpj,
@@ -92,6 +125,7 @@ async function fetchOpenCNPJ(cnpj: string): Promise<EmpresaData> {
     telefone: estabelecimento.ddd1 && estabelecimento.telefone1
       ? `(${estabelecimento.ddd1}) ${estabelecimento.telefone1}`
       : null,
+    socios,
   };
 }
 

@@ -2,7 +2,7 @@ import { EmpresaForm } from "@/components/empresa-form";
 
 export default function NovaEmpresaPage() {
   return (
-    <div className="container mx-auto py-8 px-4 max-w-3xl">
+    <div className="mx-auto py-8 px-4 w-[80%]">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Nova Empresa</h1>
         <p className="text-muted-foreground mt-1">

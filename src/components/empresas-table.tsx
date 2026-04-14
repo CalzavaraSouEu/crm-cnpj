@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatCNPJ } from "@/lib/cnpj";
 import {
   Table,
@@ -10,10 +11,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Empresa {
   id: number;
@@ -24,6 +42,7 @@ interface Empresa {
   municipio: string | null;
   uf: string | null;
   createdAt: string;
+  _count?: { socios: number };
 }
 
 interface PaginatedResponse {
@@ -37,11 +56,38 @@ interface PaginatedResponse {
 }
 
 export function EmpresasTable() {
+  const router = useRouter();
   const [response, setResponse] = useState<PaginatedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<Empresa | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/empresas/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao excluir");
+      }
+      toast.success("Empresa excluída com sucesso");
+      setDeleteTarget(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao excluir empresa"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -63,7 +109,7 @@ export function EmpresasTable() {
         setError(err instanceof Error ? err.message : "Erro desconhecido")
       )
       .finally(() => setLoading(false));
-  }, [page, search]);
+  }, [page, search, refreshKey]);
 
   // Debounce search input
   const [searchInput, setSearchInput] = useState("");
@@ -118,7 +164,9 @@ export function EmpresasTable() {
                   <TableHead>Razão Social</TableHead>
                   <TableHead>Nome Fantasia</TableHead>
                   <TableHead>Cidade/UF</TableHead>
+                  <TableHead>Sócios</TableHead>
                   <TableHead>Situação</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -137,6 +185,11 @@ export function EmpresasTable() {
                         : "—"}
                     </TableCell>
                     <TableCell>
+                      <Badge variant="secondary">
+                        {empresa._count?.socios ?? 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       {empresa.situacaoCadastral ? (
                         <Badge
                           variant={
@@ -151,11 +204,69 @@ export function EmpresasTable() {
                         "—"
                       )}
                     </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted outline-none"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(`/empresas/${empresa.id}/editar`)
+                            }
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            onClick={() => setDeleteTarget(empresa)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+
+          <AlertDialog
+            open={!!deleteTarget}
+            onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir empresa?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir{" "}
+                  <strong>{deleteTarget?.razaoSocial}</strong>? Esta ação
+                  não pode ser desfeita e todos os sócios vinculados
+                  serão removidos.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={deleting}
+                  onClick={handleDelete}
+                >
+                  {deleting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {pagination && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between">

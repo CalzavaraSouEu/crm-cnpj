@@ -30,8 +30,23 @@ model Empresa {
   telefone          String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  socios            Socio[]
 
   @@index([uf, municipio])
   @@index([razaoSocial])
   @@index([createdAt])
+}
+
+model Socio {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  cpfCnpj      String?
+  qualificacao String?
+  dataEntrada  String?
+  faixaEtaria  String?
+  empresaId    Int
+  empresa      Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@index([empresaId])
 }

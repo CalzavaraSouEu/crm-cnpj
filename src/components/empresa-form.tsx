@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, type FieldErrors } from "react-hook-form";
+import { useForm, useFieldArray, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cleanCNPJ } from "@/lib/cnpj";
 import {
@@ -23,42 +23,94 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-export function EmpresaForm() {
+interface EmpresaFormProps {
+  empresaId?: number;
+  initialData?: Record<string, unknown>;
+}
+
+export function EmpresaForm({ empresaId, initialData }: EmpresaFormProps = {}) {
   const router = useRouter();
-  const [cnpjValue, setCnpjValue] = useState("");
+  const isEditing = !!empresaId;
+
+  const buildDefaults = () => {
+    if (!initialData) {
+      return {
+        cnpj: "",
+        razaoSocial: "",
+        nomeFantasia: "",
+        situacaoCadastral: "",
+        dataAbertura: "",
+        naturezaJuridica: "",
+        capitalSocial: "",
+        porte: "",
+        cnaePrincipal: "",
+        cnaeDescricao: "",
+        logradouro: "",
+        numero: "",
+        complemento: "",
+        bairro: "",
+        municipio: "",
+        uf: "",
+        cep: "",
+        email: "",
+        telefone: "",
+        socios: [] as { nome: string; cpfCnpj: string; qualificacao: string; dataEntrada: string; faixaEtaria: string }[],
+      };
+    }
+    return {
+      cnpj: String(initialData.cnpj || ""),
+      razaoSocial: String(initialData.razaoSocial || ""),
+      nomeFantasia: String(initialData.nomeFantasia || ""),
+      situacaoCadastral: String(initialData.situacaoCadastral || ""),
+      dataAbertura: String(initialData.dataAbertura || ""),
+      naturezaJuridica: String(initialData.naturezaJuridica || ""),
+      capitalSocial: initialData.capitalSocial != null ? String(initialData.capitalSocial) : "",
+      porte: String(initialData.porte || ""),
+      cnaePrincipal: String(initialData.cnaePrincipal || ""),
+      cnaeDescricao: String(initialData.cnaeDescricao || ""),
+      logradouro: String(initialData.logradouro || ""),
+      numero: String(initialData.numero || ""),
+      complemento: String(initialData.complemento || ""),
+      bairro: String(initialData.bairro || ""),
+      municipio: String(initialData.municipio || ""),
+      uf: String(initialData.uf || ""),
+      cep: String(initialData.cep || ""),
+      email: String(initialData.email || ""),
+      telefone: String(initialData.telefone || ""),
+      socios: Array.isArray(initialData.socios)
+        ? (initialData.socios as Record<string, unknown>[]).map((s) => ({
+            nome: String(s.nome || ""),
+            cpfCnpj: String(s.cpfCnpj || ""),
+            qualificacao: String(s.qualificacao || ""),
+            dataEntrada: String(s.dataEntrada || ""),
+            faixaEtaria: String(s.faixaEtaria || ""),
+          }))
+        : [],
+    };
+  };
+
+  const [cnpjValue, setCnpjValue] = useState(
+    initialData ? String(initialData.cnpj || "") : ""
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const {
     register,
     handleSubmit,
     setValue,
+    control,
     formState: { errors },
   } = useForm<EmpresaFormInput, unknown, EmpresaFormData>({
     resolver: zodResolver(empresaFormSchema),
-    defaultValues: {
-      cnpj: "",
-      razaoSocial: "",
-      nomeFantasia: "",
-      situacaoCadastral: "",
-      dataAbertura: "",
-      naturezaJuridica: "",
-      capitalSocial: "",
-      porte: "",
-      cnaePrincipal: "",
-      cnaeDescricao: "",
-      logradouro: "",
-      numero: "",
-      complemento: "",
-      bairro: "",
-      municipio: "",
-      uf: "",
-      cep: "",
-      email: "",
-      telefone: "",
-    },
+    defaultValues: buildDefaults(),
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "socios",
   });
 
   const handleCNPJData = useCallback(
@@ -72,6 +124,18 @@ export function EmpresaForm() {
         setValue("capitalSocial", String(data.capitalSocial), {
           shouldValidate: true,
         });
+      }
+      if (Array.isArray(data.socios)) {
+        setValue(
+          "socios",
+          data.socios.map((s: Record<string, unknown>) => ({
+            nome: String(s.nome || ""),
+            cpfCnpj: String(s.cpfCnpj || ""),
+            qualificacao: String(s.qualificacao || ""),
+            dataEntrada: String(s.dataEntrada || ""),
+            faixaEtaria: String(s.faixaEtaria || ""),
+          }))
+        );
       }
       toast.success("Dados da empresa carregados com sucesso");
     },
@@ -113,20 +177,32 @@ export function EmpresaForm() {
         cep: data.cep || null,
         email: data.email || null,
         telefone: data.telefone || null,
+        socios: data.socios
+          .filter((s) => s.nome.trim())
+          .map((s) => ({
+            nome: s.nome,
+            cpfCnpj: s.cpfCnpj || null,
+            qualificacao: s.qualificacao || null,
+            dataEntrada: s.dataEntrada || null,
+            faixaEtaria: s.faixaEtaria || null,
+          })),
       };
 
-      const res = await fetch("/api/empresas", {
-        method: "POST",
+      const url = isEditing ? `/api/empresas/${empresaId}` : "/api/empresas";
+      const method = isEditing ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Erro ao cadastrar empresa");
+        throw new Error(err.error || `Erro ao ${isEditing ? "atualizar" : "cadastrar"} empresa`);
       }
 
-      toast.success("Empresa cadastrada com sucesso!");
+      toast.success(`Empresa ${isEditing ? "atualizada" : "cadastrada"} com sucesso!`);
       router.push("/empresas");
     } catch (err) {
       toast.error(
@@ -170,12 +246,12 @@ export function EmpresaForm() {
             onDataFetched={handleCNPJData}
             onError={handleCNPJError}
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {fieldRow("razaoSocial", "Razão Social", "md:col-span-2")}
-            {fieldRow("nomeFantasia", "Nome Fantasia", "md:col-span-2")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {fieldRow("razaoSocial", "Razão Social", "sm:col-span-2 lg:col-span-3")}
+            {fieldRow("nomeFantasia", "Nome Fantasia", "sm:col-span-2 lg:col-span-3")}
             {fieldRow("situacaoCadastral", "Situação Cadastral")}
             {fieldRow("dataAbertura", "Data de Abertura")}
-            {fieldRow("naturezaJuridica", "Natureza Jurídica", "md:col-span-2")}
+            {fieldRow("naturezaJuridica", "Natureza Jurídica")}
             {fieldRow("capitalSocial", "Capital Social")}
             {fieldRow("porte", "Porte")}
           </div>
@@ -187,9 +263,9 @@ export function EmpresaForm() {
           <CardTitle>Atividade Econômica</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {fieldRow("cnaePrincipal", "CNAE Principal")}
-            {fieldRow("cnaeDescricao", "Descrição CNAE")}
+            {fieldRow("cnaeDescricao", "Descrição CNAE", "sm:col-span-1 lg:col-span-2")}
           </div>
         </CardContent>
       </Card>
@@ -199,14 +275,14 @@ export function EmpresaForm() {
           <CardTitle>Endereço</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {fieldRow("logradouro", "Logradouro", "md:col-span-3")}
-            {fieldRow("numero", "Número")}
-            {fieldRow("complemento", "Complemento", "md:col-span-2")}
-            {fieldRow("bairro", "Bairro", "md:col-span-2")}
-            {fieldRow("municipio", "Município", "md:col-span-2")}
-            {fieldRow("uf", "UF")}
-            {fieldRow("cep", "CEP")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            {fieldRow("logradouro", "Logradouro", "sm:col-span-2 lg:col-span-4")}
+            {fieldRow("numero", "Número", "lg:col-span-1")}
+            {fieldRow("complemento", "Complemento", "lg:col-span-1")}
+            {fieldRow("bairro", "Bairro", "lg:col-span-2")}
+            {fieldRow("municipio", "Município", "lg:col-span-2")}
+            {fieldRow("uf", "UF", "lg:col-span-1")}
+            {fieldRow("cep", "CEP", "lg:col-span-1")}
           </div>
         </CardContent>
       </Card>
@@ -216,10 +292,107 @@ export function EmpresaForm() {
           <CardTitle>Contato</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fieldRow("email", "E-mail")}
             {fieldRow("telefone", "Telefone")}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sócios e Administradores</CardTitle>
+          <CardDescription>
+            Quadro societário da empresa
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {fields.length > 0 ? (
+            <div className="rounded-md border overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-2 font-medium w-[30%]">Nome</th>
+                    <th className="text-left p-2 font-medium w-[20%]">CPF/CNPJ</th>
+                    <th className="text-left p-2 font-medium w-[25%]">Qualificação</th>
+                    <th className="text-left p-2 font-medium w-[15%]">Entrada</th>
+                    <th className="p-2 w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((field, index) => (
+                    <tr key={field.id} className="border-b last:border-0">
+                      <td className="p-2">
+                        <Input
+                          {...register(`socios.${index}.nome`)}
+                          placeholder="Nome do sócio"
+                          className="h-8"
+                        />
+                        {errors.socios?.[index]?.nome && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {errors.socios[index].nome.message}
+                          </p>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          {...register(`socios.${index}.cpfCnpj`)}
+                          placeholder="CPF/CNPJ"
+                          className="h-8"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          {...register(`socios.${index}.qualificacao`)}
+                          placeholder="Qualificação"
+                          className="h-8"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          {...register(`socios.${index}.dataEntrada`)}
+                          placeholder="Data"
+                          className="h-8"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => remove(index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum sócio cadastrado. Busque um CNPJ ou adicione manualmente.
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              append({
+                nome: "",
+                cpfCnpj: "",
+                qualificacao: "",
+                dataEntrada: "",
+                faixaEtaria: "",
+              })
+            }
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Adicionar Sócio
+          </Button>
         </CardContent>
       </Card>
 
@@ -235,7 +408,7 @@ export function EmpresaForm() {
         </Button>
         <Button type="submit" disabled={submitting}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Cadastrar Empresa
+          {isEditing ? "Salvar Alterações" : "Cadastrar Empresa"}
         </Button>
       </div>
     </form>

@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
+      include: { _count: { select: { socios: true } } },
     }),
     prisma.empresa.count({ where }),
   ]);
@@ -74,11 +75,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const { socios, ...empresaData } = parsed.data;
+
   const empresa = await prisma.empresa.create({
     data: {
-      ...parsed.data,
+      ...empresaData,
       cnpj: cleanCnpj,
+      socios: socios.length > 0
+        ? {
+            create: socios.map((s) => ({
+              nome: s.nome,
+              cpfCnpj: s.cpfCnpj || null,
+              qualificacao: s.qualificacao || null,
+              dataEntrada: s.dataEntrada || null,
+              faixaEtaria: s.faixaEtaria || null,
+            })),
+          }
+        : undefined,
     },
+    include: { socios: true },
   });
 
   revalidatePath("/empresas");

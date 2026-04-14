@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 export default function EmpresasPage() {
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
+    <div className="mx-auto py-8 px-4 w-[80%]">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Empresas</h1>
