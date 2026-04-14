@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Empresa {
+  id                Int      @id @default(autoincrement())
+  cnpj              String   @unique
+  razaoSocial       String
+  nomeFantasia      String?
+  situacaoCadastral String?
+  dataAbertura      String?
+  naturezaJuridica  String?
+  capitalSocial     Float?
+  porte             String?
+  cnaePrincipal     String?
+  cnaeDescricao     String?
+  logradouro        String?
+  numero            String?
+  complemento       String?
+  bairro            String?
+  municipio         String?
+  uf                String?
+  cep               String?
+  email             String?
+  telefone          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([uf, municipio])
+  @@index([razaoSocial])
+  @@index([createdAt])
+}
